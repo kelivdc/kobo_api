@@ -40,15 +40,12 @@ func ListAssets(c *fiber.Ctx) error {
 	return c.JSON(data)
 }
 
-func PullSurvey(c *fiber.Ctx) error {
+func PullSurvey(c *fiber.Ctx) (float64, error) {
 	uid := c.Params("uid")
 	hasil, err := lib.SendServer(c, "GET", os.Getenv("SERVER_URL")+"/api/v2/assets/"+uid+".json")
 	var data map[string]interface{}
 	if err := json.Unmarshal([]byte(hasil), &data); err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString("Error parsing JSON data")
-	}
-	if err != nil {
-		return c.SendStatus(fiber.StatusBadRequest)
+		panic(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 1600*time.Second)
 	defer cancel()
@@ -60,11 +57,12 @@ func PullSurvey(c *fiber.Ctx) error {
 	coll := client.Database("kobo").Collection("surveys")
 	filter := bson.D{{"uid", uid}}
 	coll.DeleteMany(ctx, filter)
-	result, err := coll.InsertOne(ctx, data)
+	coll.InsertOne(ctx, data)
 	if err != nil {
 		panic(err)
 	}
-	return c.JSON(result)
+	total := data["deployment__submission_count"]
+	return total.(float64), nil
 }
 
 func PullDetail(c *fiber.Ctx) error {
@@ -84,7 +82,6 @@ func PullDetail(c *fiber.Ctx) error {
 		log.Fatal("You must set your 'MONGODB_URI' environment variable. See\n\t https://www.mongodb.com/docs/drivers/go/current/usage-examples/#environment-variable")
 	}
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
-	var result Survey
 
 	coll := client.Database("kobo").Collection("details")
 	filter := bson.D{{"uid", uid}}
@@ -100,16 +97,19 @@ func PullDetail(c *fiber.Ctx) error {
 	if err != nil {
 		panic(err)
 	}
-	return c.JSON(result)
+	return c.JSON(updatedData)
 }
 
 func PullData(c *fiber.Ctx) error {
 	// url := os.Getenv("SERVER_URL") + "/api/v2/assets/" + uid + "/data.json" ----> Data
 	// url := os.Getenv("SERVER_URL") + "/api/v2/assets/" + uid + ".json" ---> List values
-
-	PullSurvey(c)
+	uid := c.Params("uid")
+	total, err := PullSurvey(c)
+	if err != nil {
+		panic(err)
+	}
 	PullDetail(c)
-	return c.JSON(fiber.Map{"message": "Done"})
+	return c.JSON(fiber.Map{"uid": uid, "total": total})
 }
 
 func ReadForm(c *fiber.Ctx) error {
