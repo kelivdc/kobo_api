@@ -37,6 +37,7 @@ func ListAssets(c *fiber.Ctx) error {
 	if err != nil {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
+
 	return c.JSON(data)
 }
 
@@ -112,8 +113,35 @@ func PullData(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"uid": uid, "total": total})
 }
 
+func TotalDetail(c *fiber.Ctx) error {
+	uid := c.Params("uid")
+
+	uri := os.Getenv("MONGODB_URI")
+	ctx := context.TODO()
+	if uri == "" {
+		log.Fatal("You must set your 'MONGODB_URI' environment variable. See\n\t https://www.mongodb.com/docs/drivers/go/current/usage-examples/#environment-variable")
+	}
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	filter := bson.D{{"uid", uid}}
+	type SurveyTotal struct {
+		Uid     string
+		Count   int16
+		Results []map[string]interface{}
+	}
+	var result SurveyTotal
+	coll := client.Database("kobo").Collection("details")
+	err = coll.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		// panic(err)
+		return c.JSON(fiber.Map{"Count": 0})
+	}
+	return c.JSON(result)
+}
+
 func ReadForm(c *fiber.Ctx) error {
 	uid := c.Params("uid")
+
 	uri := os.Getenv("MONGODB_URI")
 	ctx := context.TODO()
 	if uri == "" {
@@ -128,5 +156,6 @@ func ReadForm(c *fiber.Ctx) error {
 	if err != nil {
 		panic(err)
 	}
+
 	return c.JSON(result)
 }
