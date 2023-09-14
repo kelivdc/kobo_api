@@ -23,4 +23,5 @@ func InitRoutes(app *fiber.App) {
 	auth.Get("/assets/pull/:uid", controllers.PullData)
 	auth.Get("/assets/form/:uid", controllers.ReadForm)
 	auth.Get("/assets/total/:uid", controllers.TotalDetail)
+	auth.Get("/assets/data/:uid", controllers.ReadDetail)
 }
