@@ -15,6 +15,7 @@ func InitRoutes(app *fiber.App) {
 	api := app.Group("/api")
 
 	v1 := api.Group("/v1")
+	v1.Post("/test", controllers.Test)
 	v1.Post("/auth/local", controllers.Login)
 	v1.Get("/auth/create-admin", controllers.CreateAdmin)
 
@@ -23,5 +24,5 @@ func InitRoutes(app *fiber.App) {
 	auth.Get("/assets/pull/:uid", controllers.PullData)
 	auth.Get("/assets/form/:uid", controllers.ReadForm)
 	auth.Get("/assets/total/:uid", controllers.TotalDetail)
-	auth.Get("/assets/data/:uid", controllers.ReadDetail)
+	auth.Post("/assets/data/:uid", controllers.ReadDetail)
 }

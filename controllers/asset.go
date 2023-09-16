@@ -173,10 +173,22 @@ func ReadSurvey(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
+type RequestData struct {
+	Filter        string
+	Value         string
+	SortField     string
+	SortDirection string
+}
+
 func ReadDetail(c *fiber.Ctx) error {
 	uid := c.Params("uid")
 	page_size := c.Query("pageSize")
 	goto_page := c.Query("page")
+
+	data := RequestData{}
+	if err := c.BodyParser(&data); err != nil {
+		panic(err)
+	}
 	uri := os.Getenv("MONGODB_URI")
 	ctx := context.TODO()
 	if uri == "" {
@@ -184,6 +196,14 @@ func ReadDetail(c *fiber.Ctx) error {
 	}
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	filter := bson.D{{"_xform_id_string", uid}}
+	if data.Value != "" {
+		filter = bson.D{
+			{"_xform_id_string", uid},
+			{data.Filter, bson.D{
+				{"$regex", data.Value},
+			}},
+		}
+	}
 	coll := client.Database("kobo").Collection("details")
 	count, err := coll.CountDocuments(context.TODO(), filter)
 	if err != nil {
@@ -193,6 +213,14 @@ func ReadDetail(c *fiber.Ctx) error {
 	page, _ := strconv.Atoi(goto_page)
 	skip := int64(page) * int64(pageSize)
 	opts := options.Find().SetLimit(int64(pageSize)).SetSkip(skip)
+
+	if data.SortField != "" {
+		if data.SortDirection == "asc" {
+			opts = options.Find().SetLimit(int64(pageSize)).SetSkip(skip).SetSort(bson.D{{data.SortField, 1}})
+		} else {
+			opts = options.Find().SetLimit(int64(pageSize)).SetSkip(skip).SetSort(bson.D{{data.SortField, -1}})
+		}
+	}
 	cursor, err := coll.Find(ctx, filter, opts)
 	if err != nil {
 		log.Fatal(err)
@@ -202,4 +230,15 @@ func ReadDetail(c *fiber.Ctx) error {
 		panic(err)
 	}
 	return c.JSON(fiber.Map{"data": results, "recordsTotal": count})
+}
+
+func Test(c *fiber.Ctx) error {
+	data := RequestData{}
+
+	if err := c.BodyParser(&data); err != nil {
+		panic(err)
+	}
+	fmt.Println(data.Filter)
+	fmt.Println(data.Value)
+	return c.JSON(fiber.Map{"message": "Hello"})
 }
